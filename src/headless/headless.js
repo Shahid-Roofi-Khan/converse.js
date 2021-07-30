@@ -12,6 +12,7 @@ import "./plugins/chatboxes/index.js";
 import "./plugins/disco/index.js";      // XEP-0030 Service discovery
 import "./plugins/headlines.js";        // Support for headline messages
 import "./plugins/mam/index.js";        // XEP-0313 Message Archive Management
+import "./plugins/markers/index.js";    // XEP-0333 Chat Markers
 import "./plugins/muc/index.js";        // XEP-0045 Multi-user chat
 import "./plugins/ping/index.js";       // XEP-0199 XMPP Ping
 import "./plugins/pubsub.js";           // XEP-0060 Pubsub

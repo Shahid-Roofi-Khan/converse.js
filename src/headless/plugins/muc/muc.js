@@ -15,7 +15,7 @@ import { getOpenPromise } from '@converse/openpromise';
 import { initStorage } from '@converse/headless/utils/storage.js';
 import { isArchived, getMediaURLs } from '@converse/headless/shared/parsers';
 import { parseMUCMessage, parseMUCPresence } from './parsers.js';
-import { sendMarker } from '@converse/headless/shared/actions';
+import { sendMarkerForLastMessage } from '@converse/headless/plugins/markers/utils.js';
 
 const OWNER_COMMANDS = ['owner'];
 const ADMIN_COMMANDS = ['admin', 'ban', 'deop', 'destroy', 'member', 'op', 'revoke'];
@@ -211,29 +211,6 @@ const ChatRoomMixin = {
     },
 
     /**
-     * Given the passed in MUC message, send a XEP-0333 chat marker.
-     * @param { _converse.MUCMessage } msg
-     * @param { ('received'|'displayed'|'acknowledged') } [type='displayed']
-     * @param { Boolean } force - Whether a marker should be sent for the
-     *  message, even if it didn't include a `markable` element.
-     */
-    sendMarkerForMessage (msg, type = 'displayed', force = false) {
-        if (!msg || !api.settings.get('send_chat_markers').includes(type)) {
-            return;
-        }
-        if (msg?.get('is_markable') || force) {
-            const key = `stanza_id ${this.get('jid')}`;
-            const id = msg.get(key);
-            if (!id) {
-                log.error(`Can't send marker for message without stanza ID: ${key}`);
-                return;
-            }
-            const from_jid = Strophe.getBareJidFromJid(msg.get('from'));
-            sendMarker(from_jid, id, type, msg.get('type'));
-        }
-    },
-
-    /**
      * Ensures that the user is subscribed to XEP-0437 Room Activity Indicators
      * if `muc_subscribe_to_rai` is set to `true`.
      * Only affiliated users can subscribe to RAI, but this method doesn't
@@ -262,7 +239,7 @@ const ChatRoomMixin = {
                     api.settings.get('muc_subscribe_to_rai') &&
                     this.getOwnAffiliation() !== 'none') {
                 if (conn_status !== converse.ROOMSTATUS.DISCONNECTED) {
-                    this.sendMarkerForLastMessage('received', true);
+                    sendMarkerForLastMessage(this, 'received', true);
                     await this.leave();
                 }
                 this.enableRAI();
@@ -1820,6 +1797,7 @@ const ChatRoomMixin = {
             if (!message.get('received')) {
                 new_attrs.received = new Date().toISOString();
             }
+            new_attrs.is_markable = true;
         }
         return new_attrs;
     },
@@ -2589,14 +2567,16 @@ const ChatRoomMixin = {
     },
 
     clearUnreadMsgCounter () {
-        if (this.get('num_unread_general') > 0 || this.get('num_unread') > 0 || this.get('has_activity')) {
-            this.sendMarkerForMessage(this.messages.last());
-        }
         u.safeSave(this, {
             'has_activity': false,
             'num_unread': 0,
             'num_unread_general': 0
         });
+        /**
+         * @event _converse#clearUnreads
+         * @type { _converse.ChatRoom }
+         */
+        api.trigger('clearUnreads', this);
     }
 };
 

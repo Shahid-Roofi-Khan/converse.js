@@ -40,7 +40,6 @@ converse.plugins.add('converse-chat', {
             'filter_by_resource': false,
             'prune_messages_above': undefined,
             'pruning_behavior': 'unscrolled',
-            'send_chat_markers': ["received", "displayed", "acknowledged"],
             'send_chat_state_notifications': true,
         });
 

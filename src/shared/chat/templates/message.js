@@ -54,5 +54,6 @@ export default (el, o) => {
                         image="${m['og:image'] || ''}"
                         url="${m['og:url'] || ''}"></converse-message-unfurl>`) : '' }
             </div>
-        </div>`;
+        </div>
+        <converse-chat-marker .message=${el.model}></converse-chat-marker>`;
 }

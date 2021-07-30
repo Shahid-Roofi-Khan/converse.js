@@ -6,12 +6,11 @@ import log from '@converse/headless/log';
 import pick from "lodash-es/pick";
 import { Model } from '@converse/skeletor/src/model.js';
 import { _converse, api, converse } from "../../core.js";
-import { getOpenPromise } from '@converse/openpromise';
-import { initStorage } from '@converse/headless/utils/storage.js';
 import { debouncedPruneHistory, pruneHistory } from '@converse/headless/shared/chat/utils.js';
 import { getMediaURLs } from '@converse/headless/shared/parsers';
+import { getOpenPromise } from '@converse/openpromise';
+import { initStorage } from '@converse/headless/utils/storage.js';
 import { parseMessage } from './parsers.js';
-import { sendMarker } from '@converse/headless/shared/actions';
 
 const { Strophe, $msg } = converse.env;
 
@@ -213,7 +212,7 @@ const ChatBox = ModelWithContact.extend({
      * @async
      * @private
      * @method _converse.ChatBox#onMessage
-     * @param { MessageAttributes } attrs_promse - A promise which resolves to the message attributes.
+     * @param { Promise<MessageAttributes> } attrs - A promise which resolves to the message attributes.
      */
     async onMessage (attrs) {
         attrs = await attrs;
@@ -224,9 +223,14 @@ const ChatBox = ModelWithContact.extend({
         const message = this.getDuplicateMessage(attrs);
         if (message) {
             this.updateMessage(message, attrs);
-        } else if (
+            return;
+        }
+        const handled = await api.hook('handleNewMessage', { 'model': this, attrs }, false);
+        if (handled) {
+            return;
+        }
+        if (
                 !this.handleReceipt(attrs) &&
-                !this.handleChatMarker(attrs) &&
                 !(await this.handleRetraction(attrs))
         ) {
             this.setEditable(attrs, attrs.time);
@@ -458,6 +462,18 @@ const ChatBox = ModelWithContact.extend({
     updateMessage (message, attrs) {
         const new_attrs = this.getUpdatedMessageAttributes(message, attrs);
         new_attrs && message.save(new_attrs);
+        /**
+         * Triggered when we have received the same message again, and updated
+         * the stored attributes accordingly.
+         *
+         * This mainly applies to reflected MUC messages or MAM versions of
+         * already locally cached messages.
+         * @event _converse#messageUpdated
+         * @param { (_converse.ChatBox | _converse.ChatRoom ) } chat
+         * @param { _converse.Message } message
+         * @param { Object } new_attrs - The new attributes being set on the message
+         */
+        api.trigger('messageUpdated', this, message, new_attrs);
     },
 
     /**
@@ -721,56 +737,6 @@ const ChatBox = ModelWithContact.extend({
         return _converse.connection.send(msg);
     },
 
-    /**
-     * Finds the last eligible message and then sends a XEP-0333 chat marker for it.
-     * @param { ('received'|'displayed'|'acknowledged') } [type='displayed']
-     * @param { Boolean } force - Whether a marker should be sent for the
-     *  message, even if it didn't include a `markable` element.
-     */
-    sendMarkerForLastMessage (type='displayed', force=false) {
-        const msgs = Array.from(this.messages.models);
-        msgs.reverse();
-        const msg = msgs.find(m => m.get('sender') === 'them' && (force || m.get('is_markable')));
-        msg && this.sendMarkerForMessage(msg, type, force);
-    },
-
-    /**
-     * Given the passed in message object, send a XEP-0333 chat marker.
-     * @param { _converse.Message } msg
-     * @param { ('received'|'displayed'|'acknowledged') } [type='displayed']
-     * @param { Boolean } force - Whether a marker should be sent for the
-     *  message, even if it didn't include a `markable` element.
-     */
-    sendMarkerForMessage (msg, type='displayed', force=false) {
-        if (!msg || !api.settings.get('send_chat_markers').includes(type)) {
-            return;
-        }
-        if (msg?.get('is_markable') || force) {
-            const from_jid = Strophe.getBareJidFromJid(msg.get('from'));
-            sendMarker(from_jid, msg.get('msgid'), type, msg.get('type'));
-        }
-    },
-
-    handleChatMarker (attrs) {
-        const to_bare_jid = Strophe.getBareJidFromJid(attrs.to);
-        if (to_bare_jid !== _converse.bare_jid) {
-            return false;
-        }
-        if (attrs.is_markable) {
-            if (this.contact && !attrs.is_archived && !attrs.is_carbon) {
-                sendMarker(attrs.from, attrs.msgid, 'received');
-            }
-            return false;
-        } else if (attrs.marker_id) {
-            const message = this.messages.findWhere({'msgid': attrs.marker_id});
-            const field_name = `marker_${attrs.marker}`;
-            if (message && !message.get(field_name)) {
-                message.save({field_name: (new Date()).toISOString()});
-            }
-            return true;
-        }
-    },
-
     sendReceiptStanza (to_jid, id) {
         const receipt_stanza = $msg({
             'from': _converse.connection.jid,
@@ -946,7 +912,6 @@ const ChatBox = ModelWithContact.extend({
             message = await this.createMessage(attrs);
         }
         api.send(this.createMessageStanza(message));
-
        /**
         * Triggered when a message is being sent out
         * @event _converse#sendMessage
@@ -1077,6 +1042,14 @@ const ChatBox = ModelWithContact.extend({
      * @param {_converse.Message} message
      */
     handleUnreadMessage (message) {
+        /**
+         * Triggered once a newly received message has been received and created (or an
+         * existing message updated in the case of a correction).
+         * @event _converse#newUnreadMessage
+         * @type { _converse.ChatBox }
+         */
+        api.trigger('newUnreadMessage', this, message);
+
         if (!message?.get('body')) {
             return
         }
@@ -1089,8 +1062,6 @@ const ChatBox = ModelWithContact.extend({
                 this.ui.set('scrolled', false);
             } else if (this.isHidden()) {
                 this.incrementUnreadMsgsCounter(message);
-            } else {
-                this.sendMarkerForMessage(message);
             }
         }
     },
@@ -1106,10 +1077,12 @@ const ChatBox = ModelWithContact.extend({
     },
 
     clearUnreadMsgCounter () {
-        if (this.get('num_unread') > 0) {
-            this.sendMarkerForMessage(this.messages.last());
-        }
         u.safeSave(this, {'num_unread': 0});
+        /**
+         * @event _converse#clearUnreads
+         * @type { _converse.ChatBox }
+         */
+        api.trigger('clearUnreads', this);
     },
 
     isScrolledUp () {

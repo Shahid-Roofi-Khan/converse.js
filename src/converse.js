@@ -24,6 +24,7 @@ import "./plugins/dragresize/index.js";     // Allows chat boxes to be resized b
 import "./plugins/fullscreen/index.js";
 import "./plugins/headlines-view/index.js";
 import "./plugins/mam-views/index.js";
+import "./plugins/marker-views/index.js";   // Views for XEP-0333 Chat Markers
 import "./plugins/minimize/index.js";       // Allows chat boxes to be minimized
 import "./plugins/muc-views/index.js";      // Views related to MUC
 import "./plugins/notifications/index.js";

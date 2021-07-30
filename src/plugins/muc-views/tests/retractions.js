@@ -13,7 +13,7 @@ async function sendAndThenRetractMessage (_converse, view) {
                 from="${msg_obj.get('from')}"
                 to="${_converse.connection.jid}"
                 type="groupchat">
-            <msg_body>${msg_obj.get('message')}</msg_body>
+            <body>${msg_obj.get('message')}</body>
             <stanza-id xmlns="urn:xmpp:sid:0"
                     id="5f3dbc5e-e1d3-4077-a492-693f3769c7ad"
                     by="lounge@montague.lit"/>
@@ -718,7 +718,7 @@ describe("Message Retractions", function () {
                         from="${msg_obj.get('from')}"
                         to="${_converse.connection.jid}"
                         type="groupchat">
-                    <msg_body>${msg_obj.get('message')}</msg_body>
+                    <body>${msg_obj.get('message')}</body>
                     <stanza-id xmlns="urn:xmpp:sid:0"
                             id="${stanza_id}"
                             by="lounge@montague.lit"/>
@@ -767,7 +767,7 @@ describe("Message Retractions", function () {
                         from="${msg_obj.get('from')}"
                         to="${_converse.connection.jid}"
                         type="groupchat">
-                    <msg_body>${msg_obj.get('message')}</msg_body>
+                    <body>${msg_obj.get('message')}</body>
                     <stanza-id xmlns="urn:xmpp:sid:0"
                             id="${stanza_id}"
                             by="lounge@montague.lit"/>

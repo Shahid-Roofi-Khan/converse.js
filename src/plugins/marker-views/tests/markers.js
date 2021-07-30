@@ -1,7 +1,7 @@
 /*global mock, converse */
 
-const Strophe = converse.env.Strophe;
-const u = converse.env.utils;
+const { Strophe, u } = converse.env;
+
 // See: https://xmpp.org/rfcs/rfc3921.html
 
 

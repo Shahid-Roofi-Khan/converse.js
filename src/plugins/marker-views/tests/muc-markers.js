@@ -5,6 +5,7 @@ const u = converse.env.utils;
 
 
 describe("A XEP-0333 Chat Marker", function () {
+
     it("may be returned for a MUC message",
             mock.initConverse([], {}, async function (_converse) {
 
