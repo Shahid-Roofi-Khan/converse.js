@@ -21,7 +21,7 @@ export default class ChatMarker extends Model {
      */
     removeMarkerJID (jid) {
         const marked_by = this.get('marked_by');
-        if (marked_by.includes(jid) && marked_by.length === 1) {
+        if (marked_by[jid] && Object.keys(marked_by).length === 1) {
             this.destroy();
         } else {
             this.save({'marked_by': [...marked_by.splice(marked_by.indexOf(jid))]});

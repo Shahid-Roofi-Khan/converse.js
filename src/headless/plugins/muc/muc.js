@@ -2567,16 +2567,21 @@ const ChatRoomMixin = {
     },
 
     clearUnreadMsgCounter () {
+        /**
+         * Event that gets called when the unread messages counters will be
+         * cleared. Gets called before the counters are set to zero.
+         * This provides more flexibility to event handlers, who might want to
+         * know what the counter values were before clearing.
+         * @event _converse#clearUnreads
+         * @type { _converse.ChatRoom }
+         */
+        api.trigger('clearUnreads', this);
+
         u.safeSave(this, {
             'has_activity': false,
             'num_unread': 0,
             'num_unread_general': 0
         });
-        /**
-         * @event _converse#clearUnreads
-         * @type { _converse.ChatRoom }
-         */
-        api.trigger('clearUnreads', this);
     }
 };
 

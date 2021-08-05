@@ -27,7 +27,7 @@ export default (el, o) => {
                         <time timestamp="${el.model.get('edited') || el.model.get('time')}" class="chat-msg__time">${o.pretty_time}</time>
                         ${ o.is_encrypted ? html`<span class="fa fa-lock"></span>` : '' }
                     </span>` : '' }
-                <div class="chat-msg__body chat-msg__body--${o.message_type} ${o.received ? 'chat-msg__body--received' : '' } ${o.is_delayed ? 'chat-msg__body--delayed' : '' }">
+                <div class="chat-msg__body chat-msg__body--${el.model.get('type')} ${o.received ? 'chat-msg__body--received' : '' } ${o.is_delayed ? 'chat-msg__body--delayed' : '' }">
                     <div class="chat-msg__message">
                         ${ (o.is_me_message) ? html`
                             <time timestamp="${o.edited || o.time}" class="chat-msg__time">${o.pretty_time}</time>&nbsp;
@@ -41,7 +41,7 @@ export default (el, o) => {
                         ?hide_url_previews=${el.model.get('hide_url_previews')}
                         ?is_retracted=${o.is_retracted}
                         unfurls="${el.model.get('ogp_metadata')?.length}"
-                        message_type="${o.message_type}"></converse-message-actions>
+                        message_type="${el.model.get('type')}"></converse-message-actions>
                 </div>
 
                 ${ !el.model.get('hide_url_previews') ? el.model.get('ogp_metadata')?.map(m =>

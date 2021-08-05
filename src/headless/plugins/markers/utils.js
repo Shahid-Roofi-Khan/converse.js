@@ -1,5 +1,6 @@
 import ChatMarker from './marker.js';
 import log from '@converse/headless/log';
+import { MARKER_TYPES } from './constants.js';
 import { _converse, api, converse } from '@converse/headless/core.js';
 import { getOpenPromise } from '@converse/openpromise';
 import { initStorage } from '@converse/headless/utils/storage.js';
@@ -20,14 +21,18 @@ export function getMessageIdToMark (message) {
  *
  * See [XEP-0333](https://xmpp.org/extensions/xep-0333.html)
  *
- * @param { _converse.ChatBox | _converse.ChatRoom } model
+ * @param { _converse.ChatBox | _converse.ChatRoom } chat
  * @param { _converse.Message } message - The message being marked
  * @param { String } by_jid - The JID of the user who sent a marker
+ * @param { ('received'|'displayed'|'acknowledged') } type - The type of chat marker being added
  * @returns { ChatMarker }
  */
-export function addChatMarker (model, message, by_jid) {
-    if (model.get('type') === _converse.CHATROOMS_TYPE) {
-        if (model.occupants.length > api.settings.get('muc_chat_markers_limit')) {
+export function addChatMarker (chat, message, by_jid, type='displayed') {
+    if (chat.get('type') === _converse.CHATROOMS_TYPE) {
+        if (
+            by_jid !== _converse.bare_jid &&
+            chat.occupants.length > api.settings.get('muc_chat_markers_limit')
+        ) {
             // XXX: this might cause orphaned ChatMarker instances in the chat.
             // For example if muc_chat_markers_limit is 10, then as the MUC
             // grows to 11 users, we will no longer create new ChatMarkers and
@@ -35,23 +40,31 @@ export function addChatMarker (model, message, by_jid) {
             return;
         }
     }
+
+    if (!Object.keys(MARKER_TYPES).includes(type)) {
+        throw new TypeError('Invalid XEP-0333 chat marker type');
+    }
+
     const marked_message_id = getMessageIdToMark(message);
-    const marked = model.markers.get(marked_message_id);
+    const marked = chat.markers.get(marked_message_id);
+    const marked_entry = {};
+    marked_entry[by_jid] = type;
+
     if (marked) {
-        const marked_by = marked.get('marked_by') || [];
-        marked.save({'marked_by': [...marked_by, by_jid]});
+        const marked_by = Object.assign(marked.get('marked_by') || {}, marked_entry);
+        marked.save({ marked_by });
         return marked;
     } else {
         // Update (and potentially remove) existing markers to remove `by_jid`
-        const predicate = m => m instanceof ChatMarker && m.get('marked_by').includes(by_jid);
-        model.markers.findWhere(predicate)?.removeMarkerJID(by_jid);
+        const predicate = m => m instanceof ChatMarker && m.get('marked_by')?.[by_jid];
+        chat.markers.findWhere(predicate)?.removeMarkerJID(by_jid);
 
-        const data = {
+        const marker_data = {
             'id': marked_message_id,
-            'marked_by': [by_jid],
+            'marked_by': marked_entry,
             'time': (new Date()).setMilliseconds((new Date(message.get('time'))).getMilliseconds()+1)
         }
-        return model.markers.add(new ChatMarker(data));
+        return chat.markers.add(new ChatMarker(marker_data));
     }
 }
 
@@ -85,20 +98,22 @@ export function sendMarkerForLastMessage (chat, type='displayed', force=false) {
     const msgs = Array.from(chat.messages.models);
     msgs.reverse();
     const msg = msgs.find(m => force || m.get('is_markable'));
-    msg && sendMarkerForMessage(msg, type, force);
+    msg && sendMarkerForMessage(msg, type, force) && addChatMarker(chat, msg, _converse.bare_jid);
 }
 
 
 /**
- * Given the passed in message object, send a XEP-0333 chat marker.
+ * Given the passed in message object, send a XEP-0333 chat marker if appropriate.
  * @param { _converse.Message } msg
  * @param { ('received'|'displayed'|'acknowledged') } [type='displayed']
  * @param { Boolean } [force=false] - Whether a marker should be sent for the
  *  message, even if it didn't include a `markable` element.
+ * @returns { Boolean } Returns `true` or `false` depending on whether the
+ *  marker was actually sent out.
  */
 export function sendMarkerForMessage (msg, type='displayed', force=false) {
     if (!msg || !api.settings.get('send_chat_markers').includes(type)) {
-        return;
+        return false;
     }
     if (msg?.get('is_markable') || force) {
         const from_jid = Strophe.getBareJidFromJid(msg.get('from'));
@@ -106,30 +121,44 @@ export function sendMarkerForMessage (msg, type='displayed', force=false) {
         const field_name = `marked_${type}`;
         const marked = msg.get(field_name) || [];
         msg.save({field_name: [...marked, _converse.bare_jid]});
+        return true;
     }
+    return false;
 }
 
 /**
- * Given the passed in MUC message, send a XEP-0333 chat marker.
+ * Given the passed in MUC message, send a XEP-0333 chat marker if appropriate.
  * @param { _converse.MUCMessage } msg
  * @param { ('received'|'displayed'|'acknowledged') } [type='displayed']
- * @param { Boolean } [force=false] - Whether a marker should be sent for the
- *  message, even if it didn't include a `markable` element.
+ * @returns { Boolean } Returns `true` or `false` depending on whether the
+ *  marker was actually sent out.
  */
-export function sendMarkerForMUCMessage (chat, msg, type='displayed', force=false) {
-    if (!msg || !api.settings.get('send_chat_markers').includes(type)) {
-        return;
+export function sendMarkerForMUCMessage (chat, msg, type='displayed') {
+    if (!Object.keys(MARKER_TYPES).includes(type)) {
+        throw new TypeError('Invalid XEP-0333 chat marker type');
     }
-    if (msg?.get('is_markable') || force) {
+
+    if (!msg || !api.settings.get('send_chat_markers').includes(type)) {
+        return false;
+    }
+    if (msg?.get('is_markable')) {
+        const mid = getMessageIdToMark(msg);
+        if (chat.markers.get(mid)?.get('marked_by')?.[_converse.bare_jid] ?? -1 > MARKER_TYPES[type]) {
+            // Already marked, either by the same marker value or by a higher ranked one.
+            // https://xmpp.org/extensions/xep-0333.html#format
+            return false;
+        }
         const key = `stanza_id ${chat.get('jid')}`;
         const id = msg.get(key);
         if (!id) {
             log.error(`Can't send marker for message without stanza ID: ${key}`);
-            return;
+            return false;
         }
         const from_jid = Strophe.getBareJidFromJid(msg.get('from'));
         sendChatMarker(from_jid, id, type, msg.get('type'));
+        return true;
     }
+    return false;
 }
 
 
@@ -143,16 +172,15 @@ export function handleUnreadMessage (chat, message) {
     if (!message?.get('body') || !u.isNewMessage(message) || chat.isHidden()) {
         return
     }
-    sendMarkerForMessage(message);
+    sendMarkerForMessage(message) && addChatMarker(chat, message, _converse.bare_jid);
 }
 
 
 /**
- * Given an incoming message's attributes, check whether we need to respond
- * with a <received> marker or whether the message itself is a marker.
+ * Given an incoming message's attributes, check whether its a chat marker, and
+ * if so, create a {@link _converse.ChatMarker}.
  * @param { MessageAttributes } attrs
- * @returns { Boolean } Returns `true` if the attributes are from a marker
- * messages, and `false` otherwise.
+ * @returns { Boolean } Returns `true` if the attributes are from a marker, and `false` otherwise.
  */
 export function handleChatMarker (data, handled) {
     const { attrs, model } = data;
@@ -160,20 +188,9 @@ export function handleChatMarker (data, handled) {
     if (to_bare_jid !== _converse.bare_jid) {
         return handled;
     }
-
-    if (attrs.is_markable) {
-        if (model.contact && !attrs.is_archived && !attrs.is_carbon) {
-            sendChatMarker(attrs.from, attrs.msgid, 'received');
-        }
-    } else if (attrs.marker_id) {
+    if (attrs.marker_id) {
         const message = model.messages.findWhere({'msgid': attrs.marker_id});
-        if (message) {
-            const field_name = `marked_${attrs.marker}`;
-            const marked = message.get(field_name) || [];
-            if (!marked.includes(_converse.bare_jid)) {
-                message.save({field_name: [...marked, _converse.bare_jid]});
-            }
-        }
+        message && addChatMarker(model, message, message.get('from'), message.get('marker'))
         return true;
     }
     return handled;
@@ -183,24 +200,26 @@ export function onMessageUpdated (chat, message) {
     if (chat.isHidden() || chat.get('type') !== _converse.CHATROOMS_TYPE) {
         return;
     }
-    sendMarkerForMUCMessage(chat, message);
+    sendMarkerForMUCMessage(chat, message) && addChatMarker(chat, message, _converse.bare_jid);
 }
 
 export function onMessageSent ({ chatbox, message }) {
     if (chatbox.isHidden() || chatbox.get('type') === _converse.CHATROOMS_TYPE) {
         return;
     }
-    sendMarkerForMessage(message, 'displayed', true)
+    sendMarkerForMessage(message, 'displayed', true) && addChatMarker(chatbox, message, _converse.bare_jid);
 }
 
 export function onUnreadsCleared (chat) {
     if (chat.get('type') === _converse.CHATROOMS_TYPE) {
         if (chat.get('num_unread_general') > 0 || chat.get('num_unread') > 0 || chat.get('has_activity')) {
-            sendMarkerForMUCMessage(chat, chat.messages.last());
+            const message = chat.messages.last();
+            sendMarkerForMUCMessage(chat, message) && addChatMarker(chat, message, _converse.bare_jid);
         }
     } else {
         if (chat.get('num_unread') > 0) {
-            sendMarkerForMessage(chat.messages.last());
+            const message = chat.messages.last();
+            sendMarkerForMessage(message) && addChatMarker(chat, message, _converse.bare_jid);
         }
     }
 }

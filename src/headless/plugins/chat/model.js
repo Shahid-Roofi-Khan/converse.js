@@ -1079,6 +1079,10 @@ const ChatBox = ModelWithContact.extend({
     clearUnreadMsgCounter () {
         u.safeSave(this, {'num_unread': 0});
         /**
+         * Event that gets called when the unread messages counter will be
+         * cleared. Gets called before the counters are set to zero.
+         * This provides more flexibility to event handlers, who might want to
+         * know what the counter values were before clearing.
          * @event _converse#clearUnreads
          * @type { _converse.ChatBox }
          */
