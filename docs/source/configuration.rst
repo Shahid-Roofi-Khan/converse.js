@@ -1366,6 +1366,22 @@ automatically be "john". If now john@differentdomain.com tries to join the
 room, his nickname will be "john-2", and if john@somethingelse.com joins, then
 his nickname will be "john-3", and so forth.
 
+
+muc_send_markers_for_own_messages
+---------------------------------
+
+* Default: ``false``
+
+Set to ``true`` if you want XEP-0333 chat markers to be sent out for your own
+``groupchat`` messages.
+
+Sending markers for your own messages in a MUC is needed by Prosody's
+`mod_muc_rai <https://modules.prosody.im/mod_muc_rai.html>`_
+(which implements XEP-0437 Room Activity Indicators) to prevent it from
+treating your own messages as unread and therefore wrongly sending out activity
+indicators.
+
+
 muc_send_probes
 ---------------
 

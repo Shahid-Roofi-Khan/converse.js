@@ -56,7 +56,7 @@ describe("Emojis", function () {
                 .c('active', {'xmlns': 'http://jabber.org/protocol/chatstates'}).tree());
             await u.waitUntil(() => view.querySelectorAll('.chat-msg__text').length === 2);
 
-            let sel = '.message:last-child .chat-msg__text';
+            let sel = '.message .chat-msg__text';
             await u.waitUntil(() => u.hasClass('chat-msg__text--larger', view.querySelector(sel)));
 
             // Test that a modified message that no longer contains only
@@ -111,7 +111,7 @@ describe("Emojis", function () {
             });
             await u.waitUntil(() => view.querySelectorAll('.chat-msg__text').length === 5);
 
-            message = view.querySelector('.message:last-child .chat-msg__text');
+            message = view.querySelector('converse-chat-message:last-child .chat-msg__text');
             expect(u.hasClass('chat-msg__text--larger', message)).toBe(true);
         }));
 
@@ -159,7 +159,7 @@ describe("Emojis", function () {
             expect(imgs[1].src).toBe(_converse.api.settings.get('emoji_image_path')+'/72x72/1f607.png');
 
             const sent_stanzas = _converse.connection.sent_stanzas;
-            const sent_stanza = sent_stanzas.filter(s => s.nodeName === 'message').pop();
+            const sent_stanza = sent_stanzas.filter(s => s.nodeName === 'message' && s.querySelector('body')).pop();
             expect(sent_stanza.querySelector('body').innerHTML).toBe('💩 😇');
         }));
 

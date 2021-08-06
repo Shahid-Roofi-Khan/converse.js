@@ -196,18 +196,25 @@ export function handleChatMarker (data, handled) {
     return handled;
 }
 
+/**
+ * Handler for the `messageUpdate` event. The point here is to send a marker
+ * once we receive a reflected MUC message.
+ *
+ * The `muc_send_markers_for_own_messages` setting determines whether a marker
+ * will be sent out.
+ *
+ * We send chat markers for our own sent messages to prevent Prosody's
+ * mod_muc_rai (which implements XEP-0437 Room Activity Indicators) from
+ * sending activity indicators for our own messages.
+ *
+ * @param { _converse.ChatRoom } chat
+ * @param { _converse.Message } message
+ */
 export function onMessageUpdated (chat, message) {
-    if (chat.isHidden() || chat.get('type') !== _converse.CHATROOMS_TYPE) {
+    if (chat.isHidden() || chat.get('type') !== _converse.CHATROOMS_TYPE || !api.settings.get('muc_send_markers_for_own_messages')) {
         return;
     }
     sendMarkerForMUCMessage(chat, message) && addChatMarker(chat, message, _converse.bare_jid);
-}
-
-export function onMessageSent ({ chatbox, message }) {
-    if (chatbox.isHidden() || chatbox.get('type') === _converse.CHATROOMS_TYPE) {
-        return;
-    }
-    sendMarkerForMessage(message, 'displayed', true) && addChatMarker(chatbox, message, _converse.bare_jid);
 }
 
 export function onUnreadsCleared (chat) {
