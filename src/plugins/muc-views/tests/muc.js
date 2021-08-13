@@ -5001,7 +5001,7 @@ describe("Groupchats", function () {
             expect(Strophe.serialize(probe)).toBe(
                 `<presence to="${muc_jid}/ralphm" type="probe" xmlns="jabber:client">`+
                     `<priority>0</priority>`+
-                    `<c hash="sha-1" node="https://conversejs.org" ver="PxXfr6uz8ClMWIga0OB/MhKNH/M=" xmlns="http://jabber.org/protocol/caps"/>`+
+                    `<c hash="sha-1" node="https://conversejs.org" ver="TfHz9vOOfqIG0Z9lW5CuPaWGnrQ=" xmlns="http://jabber.org/protocol/caps"/>`+
                 `</presence>`);
 
             let presence = u.toStanza(
@@ -5033,7 +5033,7 @@ describe("Groupchats", function () {
             expect(Strophe.serialize(probe)).toBe(
                 `<presence to="${muc_jid}/gonePhising" type="probe" xmlns="jabber:client">`+
                     `<priority>0</priority>`+
-                    `<c hash="sha-1" node="https://conversejs.org" ver="PxXfr6uz8ClMWIga0OB/MhKNH/M=" xmlns="http://jabber.org/protocol/caps"/>`+
+                    `<c hash="sha-1" node="https://conversejs.org" ver="TfHz9vOOfqIG0Z9lW5CuPaWGnrQ=" xmlns="http://jabber.org/protocol/caps"/>`+
                 `</presence>`);
 
             presence = u.toStanza(

@@ -179,6 +179,61 @@ export async function autoJoinRooms () {
 }
 
 
+/**
+ * Given a stanza, look for XEP-0316 Room Notifications and create info
+ * messages for them.
+ * @param { XMLElement } stanza
+ */
+async function handleMEPNotification (stanza) {
+    const items_el = sizzle(`items[node="${Strophe.NS.CONFINFO}"]`, stanza).pop();
+    if (!items_el) {
+        return;
+    }
+    const from = stanza.getAttribute('from');
+    const room = await api.rooms.get(from);
+    if (!room) {
+        // Eithier this is not for a MUC (hard to tell from the stanza itself)
+        // or the MUC isn't open (in which case we don't bother to open it).
+        return;
+    }
+    const msgid = stanza.getAttribute('id');
+    if (room.messages.findWhere({ msgid })) {
+        // We already handled this stanza before
+        return;
+    }
+    const selector = `item `+
+        `conference-info[xmlns="${Strophe.NS.CONFINFO}"] `+
+        `activity[xmlns="${Strophe.NS.ACTIVITY}"]`;
+    sizzle(selector, items_el)
+        .forEach(el => {
+            const message = el.querySelector('text')?.textContent;
+            if (message) {
+                const reason = el.querySelector('reason')?.textContent;
+                room.createMessage({ msgid, message, reason, 'type': 'info' });
+            }
+        });
+}
+
+
+export function registerPEPPushHandler () {
+    // Add a handler for devices pushed from other connected clients
+    _converse.connection.addHandler(
+        message => {
+            try {
+                if (sizzle(`event[xmlns="${Strophe.NS.PUBSUB}#event"]`, message).length) {
+                    handleMEPNotification(message);
+                }
+            } catch (e) {
+                log.error(e.message);
+            }
+            return true;
+        },
+        null,
+        'message',
+        'headline'
+    );
+}
+
 export function onAddClientFeatures () {
     if (api.settings.get('allow_muc')) {
         api.disco.own.features.add(Strophe.NS.MUC);
