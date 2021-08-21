@@ -1,3 +1,24 @@
+# Overview
+
+This is my fork of converse.js that i will use with jabberd or jabberd2 backend in'sha'Allah.
+
+## usage:
+make serve 
+
+## pre-reqs:
+npm and nodejs on ubuntu
+vscode
+
+## How to connect and integrate with jabberd / jabberd2:
+This is yet to be explored and is the main part
+
+
+<br/>
+<br/>
+<br/>
+
+# Original ReadMe:
+
 <h2 align="center">
   <a href="https://conversejs.org" target="_blank" rel="noopener">
     <img alt="Converse.js" src="https://github.com/conversejs/converse.js/blob/master/logo/readme.png" width="480">
