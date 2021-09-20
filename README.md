@@ -1,6 +1,6 @@
 # Overview
 
-This is my fork of converse.js that i will use with jabberd or jabberd2 backend in'sha'Allah.
+This is my fork of converse.js a small XMPP client easy to get up and running. But i dropped the idea of using it in future because of XMPP protocol being not suitable for my project
 
 ## usage:
 make serve 
